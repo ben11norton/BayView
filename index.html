@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bayview Laundry</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #F0F2F7;
+      --surface:      #FFFFFF;
+      --surface2:     #F7F8FC;
+      --border:       rgba(0,0,0,0.07);
+      --shadow:       0 2px 12px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-lg:    0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+      --green:        #00A878;
+      --green-dim:    rgba(0,168,120,0.08);
+      --green-border: rgba(0,168,120,0.22);
+      --red:          #E8354A;
+      --red-dim:      rgba(232,53,74,0.07);
+      --red-border:   rgba(232,53,74,0.22);
+      --amber:        #D97706;
+      --amber-dim:    rgba(217,119,6,0.08);
+      --amber-border: rgba(217,119,6,0.25);
+      --text:         #141820;
+      --text-mid:     #4A5468;
+      --text-dim:     #9AA3B5;
+      --mono:         'IBM Plex Mono', monospace;
+      --sans:         'Space Grotesk', sans-serif;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
+    #root { min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* ── Header ── */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 28px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo-mark {
+      width: 38px; height: 38px; border-radius: 11px;
+      background: linear-gradient(135deg, #00A878 0%, #00C2A0 100%);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,168,120,0.3);
+    }
+    .logo-mark svg { width: 21px; height: 21px; }
+    .header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; color: var(--text); }
+    .header-sub { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--green); font-family: var(--mono);
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { box-shadow: 0 0 0 0 rgba(0,168,120,0.5); }
+      50%      { box-shadow: 0 0 0 5px rgba(0,168,120,0); }
+    }
+
+    /* ── Main ── */
+    .main {
+      flex: 1; padding: 28px; display: flex; flex-direction: column;
+      gap: 24px; max-width: 900px; width: 100%; margin: 0 auto;
+    }
+    .section-label {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--text-dim); margin-bottom: -8px;
+    }
+    .cards-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+
+    @media (max-width: 520px) {
+      .cards-grid { grid-template-columns: 1fr; }
+      .main { padding: 16px; }
+      .header { padding: 16px; }
+    }
+
+    /* ── Machine Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px; padding: 24px;
+      display: flex; flex-direction: column;
+      cursor: pointer; position: relative; overflow: hidden;
+      user-select: none;
+      box-shadow: var(--shadow);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+    .card:active { transform: translateY(0); }
+    .card.out-of-order { cursor: pointer; }
+
+    .card.available   { border-color: var(--green-border); }
+    .card.in-use      { border-color: var(--red-border); }
+    .card.out-of-order { border-color: var(--amber-border); }
+
+    .card::before {
+      content: ''; position: absolute; inset: 0; border-radius: 20px; pointer-events: none;
+    }
+    .card.available::before    { background: var(--green-dim); }
+    .card.in-use::before       { background: var(--red-dim); }
+    .card.out-of-order::before { background: var(--amber-dim); }
+
+    .card.flash-green { animation: flash-g 0.55s ease-out; }
+    .card.flash-red   { animation: flash-r 0.55s ease-out; }
+    .card.flash-amber { animation: flash-a 0.55s ease-out; }
+    @keyframes flash-g { 0% { box-shadow: 0 0 0 4px rgba(0,168,120,0.35), var(--shadow); } 100% { box-shadow: var(--shadow); } }
+    @keyframes flash-r { 0% { box-shadow: 0 0 0 4px rgba(232,53,74,0.3), var(--shadow); }  100% { box-shadow: var(--shadow); } }
+    @keyframes flash-a { 0% { box-shadow: 0 0 0 4px rgba(217,119,6,0.35), var(--shadow); }  100% { box-shadow: var(--shadow); } }
+
+    .card-top {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 20px; position: relative;
+    }
+    .card-icon {
+      width: 48px; height: 48px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .available .card-icon    { background: rgba(0,168,120,0.1); }
+    .in-use .card-icon       { background: rgba(232,53,74,0.1); }
+    .out-of-order .card-icon { background: rgba(217,119,6,0.1); }
+    .card-icon svg { width: 26px; height: 26px; }
+    .available .card-icon svg    { color: var(--green); }
+    .in-use .card-icon svg       { color: var(--red); }
+    .out-of-order .card-icon svg { color: var(--amber); }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--mono);
+    }
+    .available .status-pill    { background: rgba(0,168,120,0.1); color: var(--green); }
+    .in-use .status-pill       { background: rgba(232,53,74,0.1); color: var(--red); }
+    .out-of-order .status-pill { background: rgba(217,119,6,0.1); color: var(--amber); }
+
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .available .status-dot    { background: var(--green); }
+    .in-use .status-dot       { background: var(--red); animation: blink 1.2s ease-in-out infinite; }
+    .out-of-order .status-dot { background: var(--amber); animation: blink 2s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+    .card-name { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 3px; position: relative; color: var(--text); }
+    .card-type { font-size: 12px; color: var(--text-dim); position: relative; }
+
+    /* ── Timer ring ── */
+    .timer-area { margin-top: 20px; position: relative; display: flex; align-items: center; gap: 16px; }
+    .ring-wrap { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+    .ring-wrap svg { transform: rotate(-90deg); }
+    .ring-bg { fill: none; stroke: rgba(232,53,74,0.1); stroke-width: 4; }
+    .ring-progress { fill: none; stroke: var(--red); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+    .ring-inner { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+    .ring-pct { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--red); }
+    .timer-info { display: flex; flex-direction: column; gap: 4px; }
+    .timer-label { font-size: 11px; color: var(--text-dim); }
+    .timer-value { font-family: var(--mono); font-size: 28px; font-weight: 500; color: var(--text); letter-spacing: -1px; line-height: 1; }
+
+    .card-cta {
+      margin-top: 20px; position: relative;
+      font-size: 13px; font-weight: 500;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .available .card-cta { color: var(--green); }
+    .out-of-order .card-cta { color: var(--amber); }
+
+    /* ── Modals ── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(20,24,32,0.45); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+      animation: fade-in 0.15s ease;
+    }
+    @keyframes fade-in { from{opacity:0;} to{opacity:1;} }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 24px; padding: 28px;
+      width: 100%; max-width: 340px;
+      box-shadow: var(--shadow-lg);
+      animation: slide-up 0.2s ease;
+    }
+    @keyframes slide-up { from{transform:translateY(16px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+    .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; color: var(--text); }
+    .modal-sub { font-size: 13px; color: var(--text-mid); margin-bottom: 20px; line-height: 1.5; }
+
+    .modal-actions { display: flex; gap: 10px; }
+    .btn-cancel {
+      flex: 1; padding: 13px; border-radius: 12px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text-mid); font-family: var(--sans); font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .btn-cancel:hover { background: var(--bg); }
+
+    .btn-primary {
+      flex: 2; padding: 13px; border-radius: 12px; border: none;
+      font-family: var(--sans); font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: opacity 0.15s; color: #fff;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary.red   { background: var(--red); }
+    .btn-primary.green { background: var(--green); }
+    .btn-primary.amber { background: var(--amber); }
+
+    .modal-divider {
+      height: 1px; background: var(--border); margin: 16px 0;
+    }
+    .btn-full {
+      width: 100%; padding: 13px; border-radius: 12px;
+      font-family: var(--sans); font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s; border: 1px solid;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-full.amber-outline {
+      background: rgba(217,119,6,0.07); border-color: var(--amber-border); color: var(--amber);
+    }
+    .btn-full.amber-outline:hover { background: rgba(217,119,6,0.14); }
+    .btn-full.green-outline {
+      background: rgba(0,168,120,0.07); border-color: var(--green-border); color: var(--green);
+    }
+    .btn-full.green-outline:hover { background: rgba(0,168,120,0.14); }
+
+    /* ── Footer ── */
+    .footer {
+      padding: 16px 28px; border-top: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .footer-text { font-size: 12px; color: var(--text-dim); }
+    .last-updated { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+
+    .loading-screen {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      gap: 10px; color: var(--text-dim); font-size: 14px;
+    }
+    .spinner {
+      width: 18px; height: 18px; border: 2px solid var(--border);
+      border-top-color: var(--green); border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to{transform:rotate(360deg);} }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCsh-8p7ITozw-E1fbezr9ORMBXK-coDR8",
+  authDomain: "bayview-laundry.firebaseapp.com",
+  databaseURL: "https://bayview-laundry-default-rtdb.firebaseio.com",
+  projectId: "bayview-laundry",
+  storageBucket: "bayview-laundry.firebasestorage.app",
+  messagingSenderId: "204674191712",
+  appId: "1:204674191712:web:f46ffa5b31e4c843198e05"
+};
+const DB_PATH = "machines";
+
+// Fixed cycle durations in ms
+const CYCLE_MS = { washer: 40 * 60 * 1000, dryer: 45 * 60 * 1000 };
+
+const MACHINES = [
+  { id: 'wm1', name: 'Washing Machine 1', type: 'washer', short: 'Washer', cycle: '40 min cycle' },
+  { id: 'wm2', name: 'Washing Machine 2', type: 'washer', short: 'Washer', cycle: '40 min cycle' },
+  { id: 'td1', name: 'Tumble Dryer 1',    type: 'dryer',  short: 'Dryer',  cycle: '45 min cycle' },
+  { id: 'td2', name: 'Tumble Dryer 2',    type: 'dryer',  short: 'Dryer',  cycle: '45 min cycle' },
+];
+
+// status: 'available' | 'in-use' | 'out-of-order'
+const DEFAULT_MACHINE = { status: 'available', endsAt: null, totalMs: null };
+
+let fbDb, fbGet, fbSet, fbRef, fbOnValue, fbOff;
+
+async function initFirebase() {
+  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js");
+  const db = await import("https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js");
+  const app = initializeApp(FIREBASE_CONFIG);
+  fbDb      = db.getDatabase(app);
+  fbGet     = db.get;
+  fbSet     = db.set;
+  fbRef     = db.ref;
+  fbOnValue = db.onValue;
+  fbOff     = db.off;
+}
+
+async function migrateAndSeed() {
+  const snap = await fbGet(fbRef(fbDb, DB_PATH));
+  const existing = snap.exists() ? snap.val() : {};
+  const writes = {};
+  MACHINES.forEach(({ id }) => {
+    const d = existing[id];
+    // Reset if missing, or if it uses the old inUse boolean schema
+    if (!d || !('status' in d)) {
+      writes[id] = DEFAULT_MACHINE;
+    }
+  });
+  if (Object.keys(writes).length > 0) {
+    await Promise.all(Object.entries(writes).map(([id, val]) => writeMachine(id, val)));
+  }
+}
+
+async function writeMachine(id, data) {
+  await fbSet(fbRef(fbDb, `${DB_PATH}/${id}`), data);
+}
+
+function fmtTime(ms) {
+  if (ms <= 0) return '0:00';
+  const totalSec = Math.ceil(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ── Icons ──
+const WasherIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="3"/>
+    <circle cx="12" cy="13" r="5"/><circle cx="12" cy="13" r="2"/>
+    <line x1="7" y1="6" x2="7.01" y2="6" strokeWidth="2.5"/>
+    <line x1="10" y1="6" x2="13" y2="6"/>
+  </svg>
+);
+const DryerIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="3"/>
+    <circle cx="12" cy="13" r="5"/>
+    <path d="M9.5 11 Q12 9 14.5 11 Q12 13 9.5 11Z" fill="currentColor" stroke="none"/>
+    <line x1="7" y1="6" x2="7.01" y2="6" strokeWidth="2.5"/>
+    <line x1="10" y1="6" x2="13" y2="6"/>
+  </svg>
+);
+const WarningIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+    <line x1="12" y1="9" x2="12" y2="13"/>
+    <line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/>
+  </svg>
+);
+
+function Ring({ pct }) {
+  const r = 28, cx = 32, cy = 32, circ = 2 * Math.PI * r;
+  return (
+    <svg width="64" height="64" viewBox="0 0 64 64">
+      <circle className="ring-bg" cx={cx} cy={cy} r={r}/>
+      <circle className="ring-progress" cx={cx} cy={cy} r={r}
+        strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)}/>
+    </svg>
+  );
+}
+
+// ── Card ──
+function MachineCard({ machine, data, now, onPress, flash }) {
+  const { status, endsAt, totalMs } = data;
+  const isOOO      = status === 'out-of-order';
+  const isInUse    = status === 'in-use' && endsAt && endsAt > now;
+  const isAvail    = !isInUse && !isOOO;
+  const remaining  = endsAt ? Math.max(0, endsAt - now) : 0;
+  const pct        = (totalMs && remaining > 0) ? remaining / totalMs : 0;
+  const Icon       = isOOO ? WarningIcon : machine.type === 'washer' ? WasherIcon : DryerIcon;
+  const stateClass = isOOO ? 'out-of-order' : isInUse ? 'in-use' : 'available';
+
+  return (
+    <div
+      className={`card ${stateClass} ${flash || ''}`}
+      onClick={() => onPress(machine, stateClass)}
+      role="button" tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onPress(machine, stateClass)}
+    >
+      <div className="card-top">
+        <div className="card-icon"><Icon/></div>
+        <div className="status-pill">
+          <span className="status-dot"/>
+          {isOOO ? 'Out of Order' : isInUse ? 'In Use' : 'Free'}
+        </div>
+      </div>
+      <div className="card-name">{machine.name}</div>
+      <div className="card-type">{isOOO ? 'Out of order' : machine.cycle}</div>
+
+      {isInUse && (
+        <div className="timer-area">
+          <div className="ring-wrap">
+            <Ring pct={pct}/>
+            <div className="ring-inner">
+              <span className="ring-pct">{Math.round(pct * 100)}%</span>
+            </div>
+          </div>
+          <div className="timer-info">
+            <span className="timer-label">Time left</span>
+            <span className="timer-value">{fmtTime(remaining)}</span>
+          </div>
+        </div>
+      )}
+
+      {isAvail && (
+        <div className="card-cta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="16"/>
+            <line x1="8" y1="12" x2="16" y2="12"/>
+          </svg>
+          Tap to start a cycle
+        </div>
+      )}
+
+      {isOOO && (
+        <div className="card-cta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          Tap to update status
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Available modal: start or mark out of order ──
+function AvailableModal({ machine, onStart, onOutOfOrder, onCancel }) {
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
+      <div className="modal">
+        <div className="modal-title">{machine.name}</div>
+        <div className="modal-sub">This machine is free. What would you like to do?</div>
+        <div className="modal-actions">
+          <button className="btn-cancel" onClick={onCancel}>Cancel</button>
+          <button className="btn-primary red" onClick={onStart}>
+            Start {machine.type === 'washer' ? '40 min' : '45 min'} cycle →
+          </button>
+        </div>
+        <div className="modal-divider"/>
+        <button className="btn-full amber-outline" onClick={onOutOfOrder}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/>
+          </svg>
+          Mark as out of order
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── In-use modal: release early or mark out of order ──
+function InUseModal({ machine, remaining, onRelease, onOutOfOrder, onCancel }) {
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
+      <div className="modal">
+        <div className="modal-title">{machine.name}</div>
+        <div className="modal-sub">
+          {remaining > 0 ? `${fmtTime(remaining)} remaining on this cycle.` : 'This cycle has finished.'}
+        </div>
+        <div className="modal-actions">
+          <button className="btn-cancel" onClick={onCancel}>Cancel</button>
+          <button className="btn-primary green" onClick={onRelease}>✓ Machine is free</button>
+        </div>
+        <div className="modal-divider"/>
+        <button className="btn-full amber-outline" onClick={onOutOfOrder}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17" strokeWidth="2.5"/>
+          </svg>
+          Mark as out of order
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Out-of-order modal: restore to available ──
+function OutOfOrderModal({ machine, onRestore, onCancel }) {
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
+      <div className="modal">
+        <div className="modal-title">{machine.name}</div>
+        <div className="modal-sub">This machine is currently marked as out of order. Mark it as available once it's been fixed.</div>
+        <button className="btn-full green-outline" style={{marginBottom: 10}} onClick={onRestore}>
+          ✓ Machine is fixed — mark available
+        </button>
+        <div className="modal-actions">
+          <button className="btn-cancel" style={{flex:1}} onClick={onCancel}>Go back</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── App ──
+function App() {
+  const [ready,        setReady]        = useState(false);
+  const [machineState, setMachineState] = useState(null);
+  const [now,          setNow]          = useState(Date.now());
+  const [modal,        setModal]        = useState(null);
+  const [flashes,      setFlashes]      = useState({});
+  const [lastUpdated,  setLastUpdated]  = useState(null);
+  const listenerRef = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await initFirebase();
+        await migrateAndSeed();
+        const machinesRef = fbRef(fbDb, DB_PATH);
+        listenerRef.current = machinesRef;
+        fbOnValue(machinesRef, snap => {
+          if (snap.exists()) { setMachineState(snap.val()); setLastUpdated(Date.now()); }
+        });
+        setReady(true);
+      } catch (err) {
+        console.error(err);
+        setReady(true);
+      }
+    })();
+    return () => { if (listenerRef.current) fbOff?.(listenerRef.current); };
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Auto-release when timer expires
+  useEffect(() => {
+    if (!machineState || !ready) return;
+    MACHINES.forEach(({ id }) => {
+      const d = machineState[id];
+      if (d?.status === 'in-use' && d.endsAt && d.endsAt <= now) {
+        writeMachine(id, DEFAULT_MACHINE).catch(console.error);
+      }
+    });
+  }, [now, machineState, ready]);
+
+  const flash = (id, cls) => {
+    setFlashes(f => ({ ...f, [id]: cls }));
+    setTimeout(() => setFlashes(f => ({ ...f, [id]: null })), 600);
+  };
+
+  const handlePress = (machine, stateClass) => {
+    const data = machineState[machine.id];
+    const remaining = data.endsAt ? Math.max(0, data.endsAt - now) : 0;
+    setModal({ machine, stateClass, remaining });
+  };
+
+  const handleStart = async () => {
+    const { machine } = modal;
+    const totalMs = CYCLE_MS[machine.type];
+    await writeMachine(machine.id, { status: 'in-use', endsAt: Date.now() + totalMs, totalMs });
+    flash(machine.id, 'flash-red');
+    setModal(null);
+  };
+
+  const handleRelease = async () => {
+    await writeMachine(modal.machine.id, DEFAULT_MACHINE);
+    flash(modal.machine.id, 'flash-green');
+    setModal(null);
+  };
+
+  const handleOutOfOrder = async () => {
+    await writeMachine(modal.machine.id, { status: 'out-of-order', endsAt: null, totalMs: null });
+    flash(modal.machine.id, 'flash-amber');
+    setModal(null);
+  };
+
+  const handleRestore = async () => {
+    await writeMachine(modal.machine.id, DEFAULT_MACHINE);
+    flash(modal.machine.id, 'flash-green');
+    setModal(null);
+  };
+
+  const freeCount = machineState
+    ? MACHINES.filter(({ id }) => {
+        const d = machineState[id];
+        return d?.status === 'available' || (d?.status === 'in-use' && d.endsAt <= now);
+      }).length
+    : 0;
+
+  const updatedStr = lastUpdated
+    ? new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '—';
+
+  const washers = MACHINES.filter(m => m.type === 'washer');
+  const dryers  = MACHINES.filter(m => m.type === 'dryer');
+
+  if (!ready || !machineState) return (
+    <div className="loading-screen"><div className="spinner"/><span>Connecting to Bayview Laundry…</span></div>
+  );
+
+  return (
+    <>
+      <div className="header">
+        <div className="header-left">
+        <div className="logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="3"/>
+                <circle cx="12" cy="13" r="5"/>
+                <circle cx="12" cy="13" r="2"/>
+                <line x1="7" y1="6" x2="7.01" y2="6" strokeWidth="2.5"/>
+                <line x1="10" y1="6" x2="13" y2="6"/>
+            </svg>
+        </div>
+          <div>
+            <div className="header-title">Bayview Laundry</div>
+            <div className="header-sub">{freeCount} of {MACHINES.length} machines free</div>
+          </div>
+        </div>
+        <div className="live-badge"><span className="live-dot"/>Live</div>
+      </div>
+
+      <div className="main">
+        <div className="section-label">Washing Machines</div>
+        <div className="cards-grid">
+          {washers.map(m => (
+            <MachineCard key={m.id} machine={m} data={machineState[m.id] || DEFAULT_MACHINE}
+              now={now} onPress={handlePress} flash={flashes[m.id]}/>
+          ))}
+        </div>
+        <div className="section-label">Tumble Dryers</div>
+        <div className="cards-grid">
+          {dryers.map(m => (
+            <MachineCard key={m.id} machine={m} data={machineState[m.id] || DEFAULT_MACHINE}
+              now={now} onPress={handlePress} flash={flashes[m.id]}/>
+          ))}
+        </div>
+      </div>
+
+      <div className="footer">
+        <span className="footer-text">Tap a machine to update its status</span>
+        <span className="last-updated">Updated {updatedStr}</span>
+      </div>
+
+      {modal?.stateClass === 'available' && (
+        <AvailableModal machine={modal.machine}
+          onStart={handleStart} onOutOfOrder={handleOutOfOrder} onCancel={() => setModal(null)}/>
+      )}
+      {modal?.stateClass === 'in-use' && (
+        <InUseModal machine={modal.machine} remaining={modal.remaining}
+          onRelease={handleRelease} onOutOfOrder={handleOutOfOrder} onCancel={() => setModal(null)}/>
+      )}
+      {modal?.stateClass === 'out-of-order' && (
+        <OutOfOrderModal machine={modal.machine}
+          onRestore={handleRestore} onCancel={() => setModal(null)}/>
+      )}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
