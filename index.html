@@ -362,25 +362,53 @@ function getTodayKey() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-// Session dedup: one visit per session per day
+// Get or create a persistent UUID for this device/browser
+function getOrCreateUserId() {
+  try {
+    let id = localStorage.getItem('bv_user_id');
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem('bv_user_id', id);
+    }
+    return id;
+  } catch(e) {
+    // localStorage blocked (e.g. private browsing) — fall back to session ID
+    let id = sessionStorage.getItem('bv_session_id');
+    if (!id) { id = crypto.randomUUID(); sessionStorage.setItem('bv_session_id', id); }
+    return id;
+  }
+}
+
 async function recordVisit() {
   const today = getTodayKey();
+  const userId = getOrCreateUserId();
+
+  // Dedupe: one visit-count increment per session regardless
   const sessionKey = `bv_visited_${today}`;
   if (sessionStorage.getItem(sessionKey)) return;
   sessionStorage.setItem(sessionKey, '1');
 
   try {
-    // Increment daily counter
-    await fbUpdate(fbRef(fbDb, `analytics/daily/${today}`), {
-      visits: fbIncrement(1),
-      date: today,
-    });
-    // Increment total
-    await fbUpdate(fbRef(fbDb, 'analytics/totals'), {
-      visits: fbIncrement(1),
-    });
-    // Log a visit event for hourly heatmap
     const hour = new Date().getHours();
+
+    // Check if this user has visited today already (for unique user count)
+    const userTodaySnap = await fbGet(fbRef(fbDb, `analytics/users/${today}/${userId}`));
+    const isNewUserToday = !userTodaySnap.exists();
+
+    // Mark this user as seen today
+    await fbSet(fbRef(fbDb, `analytics/users/${today}/${userId}`), true);
+
+    // Increment daily visit counter + unique users if new
+    const dailyUpdate = { visits: fbIncrement(1), date: today };
+    if (isNewUserToday) dailyUpdate.uniqueUsers = fbIncrement(1);
+    await fbUpdate(fbRef(fbDb, `analytics/daily/${today}`), dailyUpdate);
+
+    // Increment totals
+    const totalsUpdate = { visits: fbIncrement(1) };
+    if (isNewUserToday) totalsUpdate.uniqueUsers = fbIncrement(1);
+    await fbUpdate(fbRef(fbDb, 'analytics/totals'), totalsUpdate);
+
+    // Hourly heatmap
     await fbUpdate(fbRef(fbDb, `analytics/hourly/${today}`), {
       [`h${hour}`]: fbIncrement(1),
     });
