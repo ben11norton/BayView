@@ -54,6 +54,7 @@
     .logo-mark svg { width: 21px; height: 21px; }
     .header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; color: var(--text); }
     .header-sub { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .live-badge {
       display: flex; align-items: center; gap: 6px;
       font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
@@ -67,6 +68,7 @@
       0%,100% { box-shadow: 0 0 0 0 rgba(0,168,120,0.5); }
       50%      { box-shadow: 0 0 0 5px rgba(0,168,120,0); }
     }
+    .header-timestamp { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
 
     /* ── Main ── */
     .main {
@@ -98,7 +100,6 @@
     }
     .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
     .card:active { transform: translateY(0); }
-    .card.out-of-order { cursor: pointer; }
 
     .card.available   { border-color: var(--green-border); }
     .card.in-use      { border-color: var(--red-border); }
@@ -211,9 +212,8 @@
     .btn-primary.green { background: var(--green); }
     .btn-primary.amber { background: var(--amber); }
 
-    .modal-divider {
-      height: 1px; background: var(--border); margin: 16px 0;
-    }
+    .modal-divider { height: 1px; background: var(--border); margin: 16px 0; }
+
     .btn-full {
       width: 100%; padding: 13px; border-radius: 12px;
       font-family: var(--sans); font-size: 14px; font-weight: 600;
@@ -228,6 +228,48 @@
       background: rgba(0,168,120,0.07); border-color: var(--green-border); color: var(--green);
     }
     .btn-full.green-outline:hover { background: rgba(0,168,120,0.14); }
+
+    /* ── Feedback modal extras ── */
+    .feedback-stars { display: flex; gap: 8px; margin-bottom: 16px; }
+    .star-btn {
+      background: none; border: none; cursor: pointer; font-size: 28px;
+      padding: 2px; transition: transform 0.1s; line-height: 1;
+      filter: grayscale(1) opacity(0.35);
+    }
+    .star-btn.active { filter: none; transform: scale(1.15); }
+    .star-btn:hover  { filter: none; transform: scale(1.2); }
+
+    .feedback-textarea {
+      width: 100%; min-height: 90px; padding: 12px 14px;
+      border-radius: 12px; border: 1px solid var(--border);
+      background: var(--surface2); font-family: var(--sans);
+      font-size: 14px; color: var(--text); resize: none;
+      outline: none; transition: border-color 0.15s;
+    }
+    .feedback-textarea:focus { border-color: rgba(0,168,120,0.4); }
+    .feedback-textarea::placeholder { color: var(--text-dim); }
+    .feedback-char { font-family: var(--mono); font-size: 11px; color: var(--text-dim); text-align: right; margin-top: 4px; }
+
+    .feedback-success {
+      text-align: center; padding: 12px 0 4px;
+    }
+    .feedback-success-icon { font-size: 36px; margin-bottom: 8px; }
+    .feedback-success-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .feedback-success-sub { font-size: 13px; color: var(--text-mid); }
+
+    /* ── Feedback FAB ── */
+    .fab-feedback {
+      position: fixed; bottom: 24px; right: 24px; z-index: 50;
+      width: 52px; height: 52px; border-radius: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      box-shadow: var(--shadow-lg);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+      color: var(--text-mid);
+    }
+    .fab-feedback:hover { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(0,0,0,0.13); color: var(--green); }
+    .fab-feedback:active { transform: translateY(0); }
+    .fab-feedback svg { width: 22px; height: 22px; }
 
     /* ── Footer ── */
     .footer {
@@ -268,7 +310,6 @@ const FIREBASE_CONFIG = {
 };
 const DB_PATH = "machines";
 
-// Fixed cycle durations in ms
 const CYCLE_MS = { washer: 40 * 60 * 1000, dryer: 45 * 60 * 1000 };
 
 const MACHINES = [
@@ -278,21 +319,24 @@ const MACHINES = [
   { id: 'td2', name: 'Tumble Dryer 2',    type: 'dryer',  short: 'Dryer',  cycle: '45 min cycle' },
 ];
 
-// status: 'available' | 'in-use' | 'out-of-order'
 const DEFAULT_MACHINE = { status: 'available', endsAt: null, totalMs: null };
 
-let fbDb, fbGet, fbSet, fbRef, fbOnValue, fbOff;
+let fbDb, fbGet, fbSet, fbRef, fbOnValue, fbOff, fbPush, fbUpdate, fbServerTimestamp, fbIncrement;
 
 async function initFirebase() {
   const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js");
   const db = await import("https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js");
   const app = initializeApp(FIREBASE_CONFIG);
-  fbDb      = db.getDatabase(app);
-  fbGet     = db.get;
-  fbSet     = db.set;
-  fbRef     = db.ref;
-  fbOnValue = db.onValue;
-  fbOff     = db.off;
+  fbDb             = db.getDatabase(app);
+  fbGet            = db.get;
+  fbSet            = db.set;
+  fbRef            = db.ref;
+  fbOnValue        = db.onValue;
+  fbOff            = db.off;
+  fbPush           = db.push;
+  fbUpdate         = db.update;
+  fbServerTimestamp = db.serverTimestamp;
+  fbIncrement      = db.increment;
 }
 
 async function migrateAndSeed() {
@@ -301,10 +345,7 @@ async function migrateAndSeed() {
   const writes = {};
   MACHINES.forEach(({ id }) => {
     const d = existing[id];
-    // Reset if missing, or if it uses the old inUse boolean schema
-    if (!d || !('status' in d)) {
-      writes[id] = DEFAULT_MACHINE;
-    }
+    if (!d || !('status' in d)) writes[id] = DEFAULT_MACHINE;
   });
   if (Object.keys(writes).length > 0) {
     await Promise.all(Object.entries(writes).map(([id, val]) => writeMachine(id, val)));
@@ -313,6 +354,60 @@ async function migrateAndSeed() {
 
 async function writeMachine(id, data) {
   await fbSet(fbRef(fbDb, `${DB_PATH}/${id}`), data);
+}
+
+// ── Analytics helpers ──
+function getTodayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// Session dedup: one visit per session per day
+async function recordVisit() {
+  const today = getTodayKey();
+  const sessionKey = `bv_visited_${today}`;
+  if (sessionStorage.getItem(sessionKey)) return;
+  sessionStorage.setItem(sessionKey, '1');
+
+  try {
+    // Increment daily counter
+    await fbUpdate(fbRef(fbDb, `analytics/daily/${today}`), {
+      visits: fbIncrement(1),
+      date: today,
+    });
+    // Increment total
+    await fbUpdate(fbRef(fbDb, 'analytics/totals'), {
+      visits: fbIncrement(1),
+    });
+    // Log a visit event for hourly heatmap
+    const hour = new Date().getHours();
+    await fbUpdate(fbRef(fbDb, `analytics/hourly/${today}`), {
+      [`h${hour}`]: fbIncrement(1),
+    });
+  } catch(e) { console.warn('Analytics write failed', e); }
+}
+
+async function recordCycleStart(machineType) {
+  const today = getTodayKey();
+  try {
+    await fbUpdate(fbRef(fbDb, `analytics/daily/${today}`), {
+      cycles: fbIncrement(1),
+      [`cycles_${machineType}`]: fbIncrement(1),
+    });
+    await fbUpdate(fbRef(fbDb, 'analytics/totals'), {
+      cycles: fbIncrement(1),
+    });
+  } catch(e) { console.warn('Analytics write failed', e); }
+}
+
+async function submitFeedback(rating, message) {
+  const entry = {
+    rating,
+    message: message.trim(),
+    ts: Date.now(),
+    date: getTodayKey(),
+  };
+  await fbPush(fbRef(fbDb, 'feedback'), entry);
 }
 
 function fmtTime(ms) {
@@ -360,15 +455,15 @@ function Ring({ pct }) {
   );
 }
 
-// ── Card ──
+// ── Machine Card ──
 function MachineCard({ machine, data, now, onPress, flash }) {
   const { status, endsAt, totalMs } = data;
-  const isOOO      = status === 'out-of-order';
-  const isInUse    = status === 'in-use' && endsAt && endsAt > now;
-  const isAvail    = !isInUse && !isOOO;
-  const remaining  = endsAt ? Math.max(0, endsAt - now) : 0;
-  const pct        = (totalMs && remaining > 0) ? remaining / totalMs : 0;
-  const Icon       = isOOO ? WarningIcon : machine.type === 'washer' ? WasherIcon : DryerIcon;
+  const isOOO     = status === 'out-of-order';
+  const isInUse   = status === 'in-use' && endsAt && endsAt > now;
+  const isAvail   = !isInUse && !isOOO;
+  const remaining = endsAt ? Math.max(0, endsAt - now) : 0;
+  const pct       = (totalMs && remaining > 0) ? remaining / totalMs : 0;
+  const Icon      = isOOO ? WarningIcon : machine.type === 'washer' ? WasherIcon : DryerIcon;
   const stateClass = isOOO ? 'out-of-order' : isInUse ? 'in-use' : 'available';
 
   return (
@@ -413,7 +508,6 @@ function MachineCard({ machine, data, now, onPress, flash }) {
           Tap to start a cycle
         </div>
       )}
-
       {isOOO && (
         <div className="card-cta">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -427,7 +521,7 @@ function MachineCard({ machine, data, now, onPress, flash }) {
   );
 }
 
-// ── Available modal: start or mark out of order ──
+// ── Available modal ──
 function AvailableModal({ machine, onStart, onOutOfOrder, onCancel }) {
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
@@ -453,7 +547,7 @@ function AvailableModal({ machine, onStart, onOutOfOrder, onCancel }) {
   );
 }
 
-// ── In-use modal: release early or mark out of order ──
+// ── In-use modal ──
 function InUseModal({ machine, remaining, onRelease, onOutOfOrder, onCancel }) {
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
@@ -479,7 +573,7 @@ function InUseModal({ machine, remaining, onRelease, onOutOfOrder, onCancel }) {
   );
 }
 
-// ── Out-of-order modal: restore to available ──
+// ── Out-of-order modal ──
 function OutOfOrderModal({ machine, onRestore, onCancel }) {
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onCancel()}>
@@ -497,12 +591,90 @@ function OutOfOrderModal({ machine, onRestore, onCancel }) {
   );
 }
 
+// ── Feedback modal ──
+const MAX_CHARS = 280;
+function FeedbackModal({ onClose }) {
+  const [rating,    setRating]    = useState(0);
+  const [hover,     setHover]     = useState(0);
+  const [message,   setMessage]   = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [done,      setDone]      = useState(false);
+
+  const handleSubmit = async () => {
+    if (rating === 0 && !message.trim()) return;
+    setSubmitting(true);
+    try {
+      await submitFeedback(rating, message);
+      setDone(true);
+      setTimeout(onClose, 2200);
+    } catch(e) {
+      console.error(e);
+      setSubmitting(false);
+    }
+  };
+
+  const canSubmit = (rating > 0 || message.trim().length > 0) && !submitting;
+
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        {done ? (
+          <div className="feedback-success">
+            <div className="feedback-success-icon">🎉</div>
+            <div className="feedback-success-title">Thanks for the feedback!</div>
+          </div>
+        ) : (
+          <>
+            <div className="modal-title">Share feedback</div>
+            <div className="modal-sub">How's the app working for you?</div>
+
+            <div className="feedback-stars">
+              {[1,2,3,4,5].map(n => (
+                <button
+                  key={n}
+                  className={`star-btn ${n <= (hover || rating) ? 'active' : ''}`}
+                  onClick={() => setRating(n)}
+                  onMouseEnter={() => setHover(n)}
+                  onMouseLeave={() => setHover(0)}
+                  aria-label={`${n} star`}
+                >⭐</button>
+              ))}
+            </div>
+
+            <textarea
+              className="feedback-textarea"
+              placeholder="How can we improve?"
+              value={message}
+              maxLength={MAX_CHARS}
+              onChange={e => setMessage(e.target.value)}
+            />
+            <div className="feedback-char">{message.length}/{MAX_CHARS}</div>
+
+            <div className="modal-actions" style={{marginTop: 16}}>
+              <button className="btn-cancel" onClick={onClose}>Cancel</button>
+              <button
+                className="btn-primary green"
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                style={{opacity: canSubmit ? 1 : 0.45, cursor: canSubmit ? 'pointer' : 'default'}}
+              >
+                {submitting ? 'Sending…' : 'Send feedback'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── App ──
 function App() {
   const [ready,        setReady]        = useState(false);
   const [machineState, setMachineState] = useState(null);
   const [now,          setNow]          = useState(Date.now());
   const [modal,        setModal]        = useState(null);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [flashes,      setFlashes]      = useState({});
   const [lastUpdated,  setLastUpdated]  = useState(null);
   const listenerRef = useRef(null);
@@ -512,6 +684,8 @@ function App() {
       try {
         await initFirebase();
         await migrateAndSeed();
+        // Record this visit
+        recordVisit();
         const machinesRef = fbRef(fbDb, DB_PATH);
         listenerRef.current = machinesRef;
         fbOnValue(machinesRef, snap => {
@@ -557,6 +731,7 @@ function App() {
     const { machine } = modal;
     const totalMs = CYCLE_MS[machine.type];
     await writeMachine(machine.id, { status: 'in-use', endsAt: Date.now() + totalMs, totalMs });
+    recordCycleStart(machine.type);
     flash(machine.id, 'flash-red');
     setModal(null);
   };
@@ -601,21 +776,24 @@ function App() {
     <>
       <div className="header">
         <div className="header-left">
-        <div className="logo-mark">
+          <div className="logo-mark">
             <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="2" width="20" height="20" rx="3"/>
-                <circle cx="12" cy="13" r="5"/>
-                <circle cx="12" cy="13" r="2"/>
-                <line x1="7" y1="6" x2="7.01" y2="6" strokeWidth="2.5"/>
-                <line x1="10" y1="6" x2="13" y2="6"/>
+              <rect x="2" y="2" width="20" height="20" rx="3"/>
+              <circle cx="12" cy="13" r="5"/>
+              <circle cx="12" cy="13" r="2"/>
+              <line x1="7" y1="6" x2="7.01" y2="6" strokeWidth="2.5"/>
+              <line x1="10" y1="6" x2="13" y2="6"/>
             </svg>
-        </div>
+          </div>
           <div>
             <div className="header-title">Bayview Laundry</div>
             <div className="header-sub">{freeCount} of {MACHINES.length} machines free</div>
           </div>
         </div>
-        <div className="live-badge"><span className="live-dot"/>Live</div>
+        <div className="header-right">
+          <div className="live-badge"><span className="live-dot"/>Live</div>
+          <span className="header-timestamp">Updated {updatedStr}</span>
+        </div>
       </div>
 
       <div className="main">
@@ -637,8 +815,19 @@ function App() {
 
       <div className="footer">
         <span className="footer-text">Tap a machine to update its status</span>
-        <span className="last-updated">Updated {updatedStr}</span>
       </div>
+
+      {/* Feedback FAB */}
+      <button
+        className="fab-feedback"
+        onClick={() => setShowFeedback(true)}
+        title="Share feedback"
+        aria-label="Share feedback"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </button>
 
       {modal?.stateClass === 'available' && (
         <AvailableModal machine={modal.machine}
@@ -652,6 +841,7 @@ function App() {
         <OutOfOrderModal machine={modal.machine}
           onRestore={handleRestore} onCancel={() => setModal(null)}/>
       )}
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)}/>}
     </>
   );
 }
