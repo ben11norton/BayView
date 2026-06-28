@@ -650,7 +650,6 @@ function FeedbackModal({ onClose }) {
           <div className="feedback-success">
             <div className="feedback-success-icon">🎉</div>
             <div className="feedback-success-title">Thanks for the feedback!</div>
-            <div className="feedback-success-sub">It helps keep this app running well for everyone.</div>
           </div>
         ) : (
           <>
@@ -672,7 +671,7 @@ function FeedbackModal({ onClose }) {
 
             <textarea
               className="feedback-textarea"
-              placeholder="Anything to add? (optional)"
+              placeholder="How can we improve?"
               value={message}
               maxLength={MAX_CHARS}
               onChange={e => setMessage(e.target.value)}
